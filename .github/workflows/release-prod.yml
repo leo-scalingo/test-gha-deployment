@@ -29,15 +29,11 @@ jobs:
           CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=${GITHUB_SHA}" -o dist/test-gha-deployment .
           tar -czf dist/test-gha-deployment.tar.gz -C dist test-gha-deployment
           sha256sum dist/test-gha-deployment > dist/SHA256SUMS
-
-      - name: Create GitHub Release + upload assets
-        uses: Scalingo/action-gh-release@v2
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v5
         with:
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
-          draft: false
-          prerelease: false
-          generate_release_notes: true
-          files: |
-            dist/test-gha-deployment.tar.gz
-            dist/SHA256SUMS
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CGO_ENABLED: 0
