@@ -54,7 +54,7 @@ jobs:
           name: "${{ steps.meta.outputs.tag }}"
           prerelease: true
           draft: false
-          generate_release_notes: false
+          generate_release_notes: true
           files: |
             dist/test-gha-deployment.tar.gz
             dist/SHA256SUMS
