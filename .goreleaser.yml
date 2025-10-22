@@ -23,6 +23,8 @@ archives:
   - format: tar.gz
     wrap_in_directory: true
     name_template: "{{ .ProjectName }}-v{{ .Version }}-{{ .Os }}-{{ .Arch }}"
+checksum:
+  name_template: "{{ .ProjectName }}-v{{ .Version }}-{{ .Os }}-{{ .Arch }}-checksums.txt"
 
 changelog:
   sort: asc
