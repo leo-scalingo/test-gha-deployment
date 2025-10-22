@@ -9,6 +9,8 @@ permissions:
 jobs:
   prerelease:
     runs-on: ubuntu-latest
+    environment:
+      name: staging
 
     steps:
       - name: Checkout repository
