@@ -19,7 +19,7 @@ jobs:
     name: Await approval → Create GitHub Release
     runs-on: ubuntu-latest
     environment:
-      name: release        # <-- triggers the approval gate in the Environment
+      name: production        # <-- triggers the approval gate in the Environment
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
