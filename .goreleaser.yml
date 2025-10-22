@@ -10,7 +10,7 @@ before:
 
 builds:
   - id: test-gha-deployment
-    main: ./cmd/test-gha-deployment
+    main: .
     binary: test-gha-deployment
     env:
       - CGO_ENABLED=0
