@@ -1,0 +1,60 @@
+name: publish-staging
+on:
+  push:
+    branches: [ main, master ]   # triggers on both branches
+
+permissions:
+  contents: write                # required to push tags & create releases
+
+jobs:
+  prerelease:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # required to create & push tags
+
+      - name: Compute tag (branch + UTC timestamp)
+        id: meta
+        run: |
+          BRANCH="${GITHUB_REF_NAME}"
+          SAFE_BRANCH="${BRANCH//\//-}"           # replace slashes with dashes
+          TS="$(date -u +%Y%m%d%H%M%S)"           # e.g. 20251022T152312 -> 20251022152312
+          TAG="${SAFE_BRANCH}-${TS}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "branch=${SAFE_BRANCH}" >> "$GITHUB_OUTPUT"
+          echo "Generated tag: ${TAG}"
+
+      - name: Create and push tag
+        env:
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "${TAG}" -m "Automated pre-release from ${GITHUB_REF_NAME} at $(date -u -Iseconds)"
+          git push origin "${TAG}"
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Build binary and checksums
+        run: |
+          CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=${GITHUB_SHA}" -o dist/test-gha-deployment .
+          tar -czf dist/test-gha-deployment.tar.gz -C dist test-gha-deployment
+          sha256sum dist/test-gha-deployment > dist/SHA256SUMS
+
+      - name: Publish pre-release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: "Pre-release ${{ steps.meta.outputs.tag }}"
+          prerelease: true
+          draft: false
+          generate_release_notes: false
+          files: |
+            dist/test-gha-deployment.tar.gz
+            dist/SHA256SUMS
