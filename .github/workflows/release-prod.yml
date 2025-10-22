@@ -19,7 +19,7 @@ jobs:
     name: Await approval → Create GitHub Release
     runs-on: ubuntu-latest
     environment:
-      name: production        # <-- triggers the approval gate in the Environment
+      name: production        # <-- triggers the approval gate in the environment
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
@@ -31,7 +31,7 @@ jobs:
           sha256sum dist/test-gha-deployment > dist/SHA256SUMS
 
       - name: Create GitHub Release + upload assets
-        uses: softprops/action-gh-release@v2
+        uses: Scalingo/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
