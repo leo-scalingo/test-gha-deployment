@@ -16,15 +16,12 @@ jobs:
         with:
           fetch-depth: 0          # required to create & push tags
 
-      - name: Compute tag (branch + UTC timestamp)
+      - name: Compute tag (UTC timestamp)
         id: meta
         run: |
-          BRANCH="${GITHUB_REF_NAME}"
-          SAFE_BRANCH="${BRANCH//\//-}"           # replace slashes with dashes
           TS="$(date -u +%Y%m%d%H%M%S)"           # e.g. 20251022T152312 -> 20251022152312
-          TAG="${SAFE_BRANCH}-${TS}"
+          TAG="build-${TS}"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "branch=${SAFE_BRANCH}" >> "$GITHUB_OUTPUT"
           echo "Generated tag: ${TAG}"
 
       - name: Create and push tag
