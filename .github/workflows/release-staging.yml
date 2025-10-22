@@ -22,7 +22,7 @@ jobs:
         id: meta
         run: |
           TS="$(date -u +%Y%m%d%H%M%S)"           # e.g. 20251022T152312 -> 20251022152312
-          TAG="build-${TS}"
+          TAG="v0.0.0-${TS}"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "Generated tag: ${TAG}"
 
