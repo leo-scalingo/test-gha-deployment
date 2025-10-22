@@ -41,16 +41,11 @@ jobs:
           go-version-file: "go.mod"
           check-latest: true
 
-      - name: Build binary and checksums
-        run: |
-          CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=${GITHUB_SHA}" -o dist/test-gha-deployment .
-          tar -czf dist/test-gha-deployment.tar.gz -C dist test-gha-deployment
-          sha256sum dist/test-gha-deployment > dist/SHA256SUMS
-
-      - name: Publish pre-release
-        uses: Scalingo/action-gh-release@v2
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v5
         with:
-          tag_name: ${{ steps.meta.outputs.tag }}
-          name: "${{ steps.meta.outputs.tag }}"
-          prerelease: true
-          make_latest: true
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CGO_ENABLED: 0
