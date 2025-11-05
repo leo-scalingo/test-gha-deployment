@@ -1,7 +1,7 @@
 version: 1
 
 includes:
-  - from_file: .goreleaser.yaml
+  - from_file: ./.goreleaser.yml
 
 release:
   prerelease: false
