@@ -47,5 +47,6 @@ jobs:
           version: latest
           args: release --clean
         env:
+          GORELEASER_CURRENT_TAG: ${{ steps.meta.outputs.tag }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CGO_ENABLED: 0
