@@ -1,0 +1,8 @@
+version: 1
+
+includes:
+  - from_file: .goreleaser.yaml
+
+release:
+  prerelease: false
+  make_latest: true

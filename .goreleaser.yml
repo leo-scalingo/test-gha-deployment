@@ -26,6 +26,9 @@ archives:
 checksum:
   name_template: "{{ .ProjectName }}-v{{ .Version }}-checksums.txt"
 
+release:
+  prerelease: true
+
 changelog:
   sort: asc
   use: github-native
