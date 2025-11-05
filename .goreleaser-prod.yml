@@ -1,8 +1,38 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# vim: set ts=2 sw=2 tw=0 fo=cnqoj
+
 version: 1
 
-includes:
-  - from_file: ./.goreleaser.yml
+before:
+  hooks:
+    # You may remove this if you don't use go modules.
+    - go mod tidy
+
+builds:
+  - id: test-gha-deployment
+    main: .
+    binary: test-gha-deployment
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+
+archives:
+  - format: tar.gz
+    wrap_in_directory: true
+    name_template: "{{ .ProjectName }}-v{{ .Version }}-{{ .Os }}-{{ .Arch }}"
+checksum:
+  name_template: "{{ .ProjectName }}-v{{ .Version }}-checksums.txt"
 
 release:
-  prerelease: false
-  make_latest: true
+  prerelease: true
+
+changelog:
+  sort: asc
+  use: github-native
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
