@@ -27,7 +27,8 @@ checksum:
   name_template: "{{ .ProjectName }}-v{{ .Version }}-checksums.txt"
 
 release:
-  prerelease: true
+  prerelease: false
+  make_latest: true
 
 changelog:
   sort: asc
