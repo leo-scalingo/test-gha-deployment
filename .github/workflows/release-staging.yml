@@ -35,7 +35,7 @@ jobs:
           TAG="${LATEST_TAG}-patch-${SHORT_SHA}"
 
           # Get a timestamp to have unique tags even when multiple pre-releases are created for the same commit
-          TIMESTAMP="$(date +%s)"
+          TIMESTAMP="$(date +%Y%m%d%H%M%S)"
           TAG="${LATEST_TAG}-patch-${SHORT_SHA}-${TIMESTAMP}"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "Generated tag: ${TAG}"
