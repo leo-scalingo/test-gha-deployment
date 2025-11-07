@@ -29,8 +29,8 @@ jobs:
           set -euo pipefail
           # Try to find the latest semver-style tag like v1.2.3, fallback on
           # v0.0.0 if there is no tag yet
-          LATEST_TAG="$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | grep -v "patch" | head -n1)"
-          LATEST_TAG=$(test -n "$LATEST_TAG" && echo "$LATEST_TAG" || echo "v0.0.0")
+          LATEST_TAG="$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | grep -v "patch" || true | head -n1)"
+          LATEST_TAG="${LATEST_TAG:-v0.0.0}"
           SHORT_SHA="$(git rev-parse --short HEAD)"
           TAG="${LATEST_TAG}-patch-${SHORT_SHA}"
 

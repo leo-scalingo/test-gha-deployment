@@ -24,6 +24,7 @@ archives:
     wrap_in_directory: true
     name_template: "{{ .ProjectName }}-v{{ .Version }}-{{ .Os }}-{{ .Arch }}"
 checksum:
+  disable: false
   name_template: "{{ .ProjectName }}-v{{ .Version }}-checksums.txt"
 
 release:
