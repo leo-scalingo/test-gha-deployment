@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-24.04
     if: ${{ github.event_name == 'pull_request' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           # We need to define the fetch-depth to 0 so that we can get the commit ID of the master branch
           fetch-depth: 0
@@ -33,6 +33,17 @@ jobs:
         run: bash $(pwd)/lint-go-version
       - name: Get golangci-lint configuration file
         run: wget --output-document=$(pwd)/.golangci.yml https://sc-devtools.s3.eu-west-1.amazonaws.com/golang-ci/golangci.yml
+
+      # Cache go build cache, used to speedup go test
+      - id: golangci-lint-cache-paths
+        run: |
+          echo "::set-output name=golangci-lint::$HOME/.cache/golangci-lint"
+      - name: Go Build Cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.golangci-lint-cache-paths.outputs.golangci-lint }}
+          key: ${{ runner.os }}-golangci-lint-${{ hashFiles('**/go.sum') }}
+
       - name: "Execute golangci-lint on a pull request"
         uses: Scalingo/golangci-lint-action@v8
         with:
@@ -44,16 +55,36 @@ jobs:
   tests:
     name: Unit Tests
     runs-on: ubuntu-24.04
+    services:
+      mongodb:
+        image: mongo:4.0.28
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "echo \"db.runCommand({ ping: 1 }).ok\" | mongo"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
         with:
           go-version-file: "go.mod"
           check-latest: true
+
+      # Cache go build cache, used to speedup go test
+      - id: go-cache-paths
+        run: |
+          echo "::set-output name=go-build::$(go env GOCACHE)"
+      - name: Go Build Cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.go-cache-paths.outputs.go-build }}
+          key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
+
       - name: Import test environment variables
-        id: import-env
-        shell: bash
         run: test -f .env.test && cat .env.test >> "$GITHUB_ENV" || true
+
       - name: Execute the unit tests
         run: go test -race ./...
 

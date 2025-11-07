@@ -17,7 +17,7 @@ permissions:
 jobs:
   create_release:
     name: Await approval → Create GitHub Release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment:
       name: production        # <-- triggers the approval gate in the environment
     steps:
@@ -31,9 +31,9 @@ jobs:
           go-version-file: "go.mod"
           check-latest: true
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6
         with:
-          version: latest
+          version: '~> v2'
           args: release --config .goreleaser-prod.yml --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
