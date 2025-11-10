@@ -11,6 +11,7 @@ version="$1"  # e.g. 2.7.0 (no leading 'v')
 # --- helpers ---
 branch_exists_local()  { git show-ref --verify --quiet "refs/heads/$1"; }
 branch_exists_remote() { git ls-remote --exit-code --heads origin "$1" >/dev/null 2>&1; }
+ensure_cmd() { command -v "$1" >/dev/null 2>&1 || { echo "Error: missing command '$1'"; exit 67; }; }
 ensure_clean_worktree() {
   if ! git diff --quiet || ! git diff --cached --quiet; then
     echo "Error: working tree is dirty. Commit/stash your changes and retry."
@@ -18,35 +19,30 @@ ensure_clean_worktree() {
     exit 66
   fi
 }
-ensure_cmd() { command -v "$1" >/dev/null 2>&1 || { echo "Error: missing command '$1'"; exit 67; }; }
 
-# Collect GitHub usernames of commit authors between previous tag and base head
-collect_reviewers() {
+# Strict previous tag reachable from base branch: ^v\d+\.\d+\.\d+$
+find_prev_tag() {
   local base_branch="$1"
-  git fetch --tags origin >/dev/null 2>&1 || true
+  # list tags merged into base, newest first, then filter strictly vX.Y.Z
+  git tag --merged "origin/${base_branch}" --sort=-creatordate \
+    | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+    | head -n 1 || true
+}
 
-  # previous tag reachable from base branch (nearest v* tag)
-  local prev_tag
-  prev_tag="$(git tag --sort=-creatordate | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)"
-
+# Collect GitHub usernames of commit authors between prev_tag..origin/base
+collect_reviewers() {
+  local prev_tag="$1" base_branch="$2"
   local range
-  if [[ -n "$prev_tag" ]]; then
-    range="${prev_tag}..origin/${base_branch}"
-  else
-    # no previous tag; consider entire history on base (could be large)
-    range="origin/${base_branch}"
-  fi
+  if [[ -n "$prev_tag" ]]; then range="${prev_tag}..origin/${base_branch}"; else range="origin/${base_branch}"; fi
 
-  # gather commit SHAs (no merges)
+  # limit to latest 400 commits to stay snappy
   mapfile -t shas < <(git log --no-merges --format='%H' $range | head -n 400)
 
-  # map to GitHub logins via API (if commit linked to a GH user)
-  # requires: gh authenticated & repo context
   declare -A uniq
   for sha in "${shas[@]}"; do
-    # author.login can be null if email not linked; skip in that case
+    # map commit to GitHub login; may be null
     login="$(gh api repos/:owner/:repo/commits/"$sha" -q .author.login 2>/dev/null || true)"
-    [[ -z "${login}" || "${login}" == "null" ]] && continue
+    [[ -z "$login" || "$login" == "null" ]] && continue
     # filter bots
     if [[ "$login" =~ bot$ ]] || [[ "$login" == "dependabot" ]] || [[ "$login" == "github-actions" ]]; then
       continue
@@ -54,19 +50,57 @@ collect_reviewers() {
     uniq["$login"]=1
   done
 
-  # to array, limit to 15 (GitHub CLI allows up to 15 reviewers)
   local reviewers=()
   for u in "${!uniq[@]}"; do reviewers+=("$u"); done
-  if ((${#reviewers[@]} > 15)); then
-    reviewers=("${reviewers[@]:0:15}")
-  fi
+  # GitHub CLI supports up to ~15 reviewers
+  if ((${#reviewers[@]} > 15)); then reviewers=("${reviewers[@]:0:15}"); fi
 
-  # echo CSV to stdout
   if ((${#reviewers[@]} > 0)); then
     (IFS=,; echo "${reviewers[*]}")
   else
     echo ""
   fi
+}
+
+# Build Markdown changelog for PR body
+build_changelog_md() {
+  local prev_tag="$1" base_branch="$2" version="$3"
+  local repo compare_url heading
+  repo="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
+  if [[ -n "$prev_tag" ]]; then
+    compare_url="https://github.com/${repo}/compare/${prev_tag}...${base_branch}"
+    heading="Changes since ${prev_tag}"
+  else
+    compare_url="https://github.com/${repo}/tree/${base_branch}"
+    heading="Changes included in the first release"
+  fi
+
+  local range
+  if [[ -n "$prev_tag" ]]; then range="${prev_tag}..origin/${base_branch}"; else range="origin/${base_branch}"; fi
+
+  # Commit list as bullets with links
+  commits_md="$(git log --no-merges --pretty="* %s ([%h](https://github.com/${repo}/commit/%H)) — %an" $range || true)"
+
+  # Contributors list (from commits)
+  contributors_md="$(git log --no-merges --format='%an' $range 2>/dev/null \
+    | sort -fu | sed 's/^/- /')"
+
+  cat <<EOF
+# Release v${version}
+
+**Base branch:** \`${base_branch}\`  
+**Compare:** ${compare_url}
+
+## ${heading}
+
+${commits_md:-_No commits found in range._}
+
+## Contributors
+
+${contributors_md:-_No contributors detected._}
+
+> _This PR was generated to prepare the release. Upon approval & merge, CI will create the tag \`v${version}\` on the intended base commit._
+EOF
 }
 
 # --- sanity checks ---
@@ -76,7 +110,7 @@ git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "Not a git repo"; 
 ensure_clean_worktree
 git fetch --prune --tags origin
 
-# Pick base branch automatically (or from env)
+# Base branch selection
 if [[ -n "${BASE_BRANCH:-}" ]]; then
   base_branch="$BASE_BRANCH"
 else
@@ -118,30 +152,31 @@ git add VERSION
 git commit -m "Prepare release v${version}"
 git push -u origin "$prepare_branch"
 
-# --- compute reviewers from commits since previous release tag ---
-reviewers_csv="$(collect_reviewers "$base_branch" || echo "")"
-if [[ -n "$reviewers_csv" ]]; then
-  echo "Reviewers: $reviewers_csv"
-else
-  echo "No eligible reviewers found (no previous tag or no mapped GH authors)."
-fi
+# --- changelog & reviewers ---
+prev_tag="$(find_prev_tag "$base_branch" || true)"
+reviewers_csv="$(collect_reviewers "$prev_tag" "$base_branch" || echo "")"
 
-# --- open PR with gh ---
+tmpbody="$(mktemp)"
+build_changelog_md "$prev_tag" "$base_branch" "$version" > "$tmpbody"
+
+echo "Previous tag: ${prev_tag:-<none>}"
+[[ -s "$tmpbody" ]] && echo "Changelog generated."
+
+# --- open PR with gh (use changelog as body) ---
 echo "Opening PR: base='${release_branch}' ← compare='${prepare_branch}'"
-# shellcheck disable=SC2086
 if [[ -n "$reviewers_csv" ]]; then
   gh pr create \
     --base "$release_branch" \
     --head "$prepare_branch" \
     --title "Release v${version}" \
-    --body "Automated release PR for v${version}." \
+    --body-file "$tmpbody" \
     --reviewer "$reviewers_csv"
 else
   gh pr create \
     --base "$release_branch" \
     --head "$prepare_branch" \
     --title "Release v${version}" \
-    --body "Automated release PR for v${version}."
+    --body-file "$tmpbody"
 fi
 
 echo
@@ -149,3 +184,4 @@ echo "✅ Release PR created successfully!"
 echo "   Base:   $release_branch"
 echo "   Head:   $prepare_branch"
 [[ -n "$reviewers_csv" ]] && echo "   Reviewers: $reviewers_csv"
+echo "   Body:    $tmpbody"
