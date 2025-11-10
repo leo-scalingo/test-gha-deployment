@@ -62,3 +62,22 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CGO_ENABLED: 0
+
+      # --- Cleanup temporary branches after successful release ---
+      - name: Delete temporary release branches (release/* and prepare)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}   # e.g. release/v2.7.0
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}   # e.g. release/v2.7.0-prepare
+        shell: bash
+        run: |
+          set -euo pipefail
+          for ref in "$BASE_REF" "$HEAD_REF"; do
+            echo "Deleting remote branch $ref"
+            curl -sS -X DELETE \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/$REPO/git/refs/heads/$ref" \
+              || echo "Could not delete $ref (already gone or protected)."
+          done
