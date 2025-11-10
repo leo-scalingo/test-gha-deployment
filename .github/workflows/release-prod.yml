@@ -65,6 +65,7 @@ jobs:
           version: '~> v2'
           args: release --config .goreleaser-prod.yml --clean
         env:
+          GORELEASER_CURRENT_TAG: ${{ steps.meta.outputs.version }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CGO_ENABLED: 0
 
