@@ -134,8 +134,13 @@ git switch -c "$release_branch"
 git push -u origin "$release_branch"
 
 git switch -c "$prepare_branch"
+mkdir .release
 echo "${version}" > VERSION
-git add VERSION
+# Write down current SHA, so github action will put the tag correctly in the
+# base branch history and not the temporary release commit
+git rev-parse "origin/${base_branch}" > .release/target_sha
+git add VERSION .release/target_sha
+
 git commit -m "Prepare release v${version}"
 git push -u origin "$prepare_branch"
 
