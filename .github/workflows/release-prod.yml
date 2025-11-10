@@ -40,14 +40,6 @@ jobs:
           echo "version=$V" >> $GITHUB_OUTPUT
           echo "target_sha=$TARGET_SHA" >> $GITHUB_OUTPUT
 
-      - name: Create annotated tag on recorded master SHA
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "${{ steps.meta.outputs.version }}" "${{ steps.meta.outputs.target_sha }}" \
-            -m "Release ${{ steps.meta.outputs.version }}"
-          git push origin "${{ steps.meta.outputs.version }}"
-
       - name: Ensure tag does not exist
         shell: bash
         run: |
@@ -57,6 +49,15 @@ jobs:
             echo "❌ Tag v${{ steps.meta.outputs.version }} already exists"
             exit 1
           fi
+
+      - name: Create annotated tag on recorded master SHA
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.meta.outputs.version }}" "${{ steps.meta.outputs.target_sha }}" \
+            -m "Release ${{ steps.meta.outputs.version }}"
+          git push origin "${{ steps.meta.outputs.version }}"
+          git checkout "${{ steps.meta.outputs.version }}"
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
