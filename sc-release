@@ -110,20 +110,7 @@ git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "Not a git repo"; 
 ensure_clean_worktree
 git fetch --prune --tags origin
 
-# Base branch selection
-if [[ -n "${BASE_BRANCH:-}" ]]; then
-  base_branch="$BASE_BRANCH"
-else
-  if branch_exists_local main || branch_exists_remote main; then
-    base_branch="main"
-  elif branch_exists_local master || branch_exists_remote master; then
-    base_branch="master"
-  else
-    echo "Error: neither 'main' nor 'master' exists. Set BASE_BRANCH."
-    exit 69
-  fi
-fi
-
+base_branch="$(git symbolic-ref --short HEAD)"
 prepare_branch="release/v${version}-prepare"
 release_branch="release/v${version}"
 
