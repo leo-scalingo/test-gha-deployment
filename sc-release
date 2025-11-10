@@ -172,3 +172,5 @@ echo "   Base:   $release_branch"
 echo "   Head:   $prepare_branch"
 [[ -n "$reviewers_csv" ]] && echo "   Reviewers: $reviewers_csv"
 echo "   Body:    $tmpbody"
+
+git checkout "$base_branch"
