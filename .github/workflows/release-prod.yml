@@ -29,20 +29,22 @@ jobs:
           go-version-file: "go.mod"
           check-latest: true
 
-      - name: Extract version from branch name
-        id: version
+      - name: Read Release metadata
+        id: meta
         run: |
-          # Example: release/v2.7.0 → v2.7.0
-          branch="${GITHUB_BASE_REF}"
-          version="${branch#release/}"
-          echo "Version extracted from branch: $version"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          test -f VERSION || { echo "VERSION missing"; exit 1; }
+          test -f .release/target_sha || { echo ".release/target_sha missing"; exit 1; }
+          V=$(tr -d '[:space:]' < VERSION)
+          TARGET_SHA=$(tr -d '[:space:]' < .release/target_sha)
+          echo "version=$V" >> $GITHUB_OUTPUT
+          echo "target_sha=$TARGET_SHA" >> $GITHUB_OUTPUT
 
       - name: Create annotated tag on recorded master SHA
         run: |
-          git tag -a "${{ steps.version.outputs.version }}" "${{ steps.meta.outputs.target_sha }}" \
-            -m "Release ${{ steps.version.outputs.version }}"
-          git push origin "${{ steps.version.outputs.version }}"
+          git tag -a "${{ steps.meta.outputs.version }}" "${{ steps.meta.outputs.target_sha }}" \
+            -m "Release ${{ steps.meta.outputs.version }}"
+          git push origin "${{ steps.meta.outputs.version }}"
 
       - name: Ensure tag does not exist
         shell: bash
