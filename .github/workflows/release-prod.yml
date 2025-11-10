@@ -1,14 +1,10 @@
 name: Release to production
 
 on:
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: "Tag to release (e.g. v1.2.3)"
-        required: true
-  push:
-    tags:
-      - "v*.*.*"   # optional: allow tag pushes to start this
+  pull_request:
+    types: [closed]
+    branches:
+      - 'release/v*.*.*'   # PR base branch is a release/* branch
 
 permissions:
   contents: write          # needed to create the release
@@ -16,10 +12,12 @@ permissions:
 
 jobs:
   create_release:
-    name: Await approval → Create GitHub Release
+    name: Create GitHub Release
+    if: ${{ github.event.pull_request.merged == true }}
     runs-on: ubuntu-24.04
     environment:
       name: production        # <-- triggers the approval gate in the environment
+
     steps:
       - uses: actions/checkout@v5
         with:
@@ -30,6 +28,32 @@ jobs:
         with:
           go-version-file: "go.mod"
           check-latest: true
+
+      - name: Extract version from branch name
+        id: version
+        run: |
+          # Example: release/v2.7.0 → v2.7.0
+          branch="${GITHUB_BASE_REF}"
+          version="${branch#release/}"
+          echo "Version extracted from branch: $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Create annotated tag on recorded master SHA
+        run: |
+          git tag -a "${{ steps.version.outputs.version }}" "${{ steps.meta.outputs.target_sha }}" \
+            -m "Release ${{ steps.version.outputs.version }}"
+          git push origin "${{ steps.version.outputs.version }}"
+
+      - name: Ensure tag does not exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --tags
+          if git tag -l "v${{ steps.meta.outputs.version }}" | grep -qx "v${{ steps.meta.outputs.version }}"; then
+            echo "❌ Tag v${{ steps.meta.outputs.version }} already exists"
+            exit 1
+          fi
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
