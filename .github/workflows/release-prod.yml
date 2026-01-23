@@ -18,7 +18,7 @@ jobs:
     environment:
       name: production        # <-- triggers the approval gate in the environment
     steps:
-      - uses: ./go-stable-release
+      - uses: Scalingo/actions/go-stable-release@main
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
