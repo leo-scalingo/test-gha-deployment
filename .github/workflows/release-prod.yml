@@ -17,73 +17,8 @@ jobs:
     runs-on: ubuntu-24.04
     environment:
       name: production        # <-- triggers the approval gate in the environment
-
     steps:
-      - uses: actions/checkout@v5
+      - uses: ./go-stable-release
         with:
-          # `fetch-depth: 0` is required for GoReleaser to work properly.
-          # cf. https://goreleaser.com/ci/actions/
-          fetch-depth: 0
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: "go.mod"
-          check-latest: true
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Read Release metadata
-        id: meta
-        run: |
-          set -euo pipefail
-          test -f VERSION || { echo "VERSION missing"; exit 1; }
-          test -f .release/target_sha || { echo ".release/target_sha missing"; exit 1; }
-          V=$(tr -d '[:space:]' < VERSION)
-          TARGET_SHA=$(tr -d '[:space:]' < .release/target_sha)
-          echo "version=$V" >> $GITHUB_OUTPUT
-          echo "target_sha=$TARGET_SHA" >> $GITHUB_OUTPUT
-
-      - name: Ensure tag does not exist
-        shell: bash
-        run: |
-          set -euo pipefail
-          git fetch --tags
-          if git tag -l "v${{ steps.meta.outputs.version }}" | grep -qx "v${{ steps.meta.outputs.version }}"; then
-            echo "❌ Tag v${{ steps.meta.outputs.version }} already exists"
-            exit 1
-          fi
-
-      - name: Create annotated tag on recorded master SHA
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "${{ steps.meta.outputs.version }}" "${{ steps.meta.outputs.target_sha }}" \
-            -m "Release ${{ steps.meta.outputs.version }}"
-          git push origin "${{ steps.meta.outputs.version }}"
-          git checkout "${{ steps.meta.outputs.version }}"
-
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v6
-        with:
-          version: '~> v2'
-          args: release --config .goreleaser-prod.yml --clean
-        env:
-          GORELEASER_CURRENT_TAG: ${{ steps.meta.outputs.version }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CGO_ENABLED: 0
-
-      # --- Cleanup temporary branches after successful release ---
-      - name: Delete temporary release branches (release/* and prepare)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-          BASE_REF: ${{ github.event.pull_request.base.ref }}   # e.g. release/v2.7.0
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}   # e.g. release/v2.7.0-prepare
-        shell: bash
-        run: |
-          set -euo pipefail
-          for ref in "$BASE_REF" "$HEAD_REF"; do
-            echo "Deleting remote branch $ref"
-            curl -sS -X DELETE \
-              -H "Authorization: Bearer $GH_TOKEN" \
-              -H "Accept: application/vnd.github+json" \
-              "https://api.github.com/repos/$REPO/git/refs/heads/$ref" \
-              || echo "Could not delete $ref (already gone or protected)."
-          done
