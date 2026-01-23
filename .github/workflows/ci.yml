@@ -8,83 +8,19 @@ on:
 # The list of permissions is explained on the GitHub doc:
 # https://docs.github.com/en/actions/using-jobs/assigning-permissions-to-jobs
 permissions:
-  # Write permissions is needed to create a new release
-  contents: write
-  # allow read access to pull request. Use with `only-new-issues` option.
-  pull-requests: read
+  contents: read
 
 jobs:
   linter:
-    name: golangci-lint on a PR or from a tag
-    runs-on: ubuntu-24.04
+    name: Linter on a PR
     if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
-        with:
-          # We need to define the fetch-depth to 0 so that we can get the commit ID of the master branch
-          fetch-depth: 0
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: "go.mod"
-          check-latest: true
-      - name: Get lint-go-version script
-        run: wget --output-document=$(pwd)/lint-go-version https://sc-devtools.s3.eu-west-1.amazonaws.com/golang-ci/lint-go-version
-      - name: Execute lint-go-version script
-        run: bash $(pwd)/lint-go-version
-      - name: Get golangci-lint configuration file
-        run: wget --output-document=$(pwd)/.golangci.yml https://sc-devtools.s3.eu-west-1.amazonaws.com/golang-ci/golangci.yml
-
-      # Cache go build cache, used to speedup go test
-      - id: golangci-lint-cache-paths
-        run: |
-          echo "::set-output name=golangci-lint::$HOME/.cache/golangci-lint"
-      - name: Go Build Cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.golangci-lint-cache-paths.outputs.golangci-lint }}
-          key: ${{ runner.os }}-golangci-lint-${{ hashFiles('**/go.sum') }}
-
-      - name: "Execute golangci-lint on a pull request"
-        uses: Scalingo/golangci-lint-action@v8
-        with:
-          # The `only-new-issues` flag is not working (https://github.com/golangci/golangci-lint-action/issues/531).
-          # We rather decided to use the suggestion from the FAQ (https://golangci-lint.run/docs/welcome/faq/#how-to-integrate-golangci-lint-into-a-large-project-with-thousands-of-issues) and use `--new-from-rev`
-          # only-new-issues: false
-          args: "--config=$(pwd)/.golangci.yml --new-from-rev=${{ github.event.pull_request.base.sha }}"
+      - uses: Scalingo/actions/go-linter@main
 
   tests:
     name: Unit Tests
     runs-on: ubuntu-24.04
-    services:
-      mongodb:
-        image: mongo:4.0.28
-        ports:
-          - 27017:27017
-        options: >-
-          --health-cmd "echo \"db.runCommand({ ping: 1 }).ok\" | mongo"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: "go.mod"
-          check-latest: true
-
-      # Cache go build cache, used to speedup go test
-      - id: go-cache-paths
-        run: |
-          echo "::set-output name=go-build::$(go env GOCACHE)"
-      - name: Go Build Cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.go-cache-paths.outputs.go-build }}
-          key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
-
-      - name: Import test environment variables
-        run: test -f .env.test && cat .env.test >> "$GITHUB_ENV" || true
-
-      - name: Execute the unit tests
-        run: go test -race ./...
+      - uses: Scalingo/actions/go-tests@main
 
